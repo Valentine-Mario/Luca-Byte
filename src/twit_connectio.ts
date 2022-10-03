@@ -30,4 +30,19 @@ export module TwitModules{
             }
           );
     }
+    const reply=()=>{
+    }
 }
+
+// var reply = function(tweet) {
+//     var res = {
+//       status: 'This is a tweet @' + tweet.user.screen_name,
+//       in_reply_to_status_id: '' + tweet.id_str
+//     };
+  
+//     twitter.post('statuses/update', res,
+//       function(err, data, response) {
+//         console.log(data);
+//       }
+//     );
+//   }
