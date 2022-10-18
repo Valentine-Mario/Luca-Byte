@@ -1,4 +1,11 @@
-import { ETwitterStreamEvent, TwitterApi } from "twitter-api-v2";
+import {
+  ETwitterStreamEvent,
+  EUploadMimeType,
+  TwitterApi,
+} from "twitter-api-v2";
+import { imageResult } from "wikipedia/dist/resultTypes";
+import { getBuffer } from "./lib";
+import { getSummary } from "./wiki_search";
 const BOT_NAME = "ByteLuca";
 
 export const ExecBot = async (client: TwitterApi, client2: TwitterApi) => {
@@ -28,9 +35,10 @@ export const ExecBot = async (client: TwitterApi, client2: TwitterApi) => {
     const text = tweet.data.text;
 
     if (!text.toLowerCase().includes("search")) {
-      await replyTweet(client2, "invalid search request", tweet.data.id);
+      await replyTweet(client2, "invalid search request", tweet.data.id, "");
     } else {
       const search_phrase = text.match(/search\s+(.*)/i)![1];
+      const [summary, images, fullUrl] = await getSummary(search_phrase);
       // Ignore RTs or self-sent tweets
       const isARt =
         tweet.data.referenced_tweets?.some(
@@ -41,12 +49,72 @@ export const ExecBot = async (client: TwitterApi, client2: TwitterApi) => {
         return;
       }
 
-      // Reply to tweet
-      await replyTweet(client2, "hello friend ", tweet.data.id);
+      const filtered = (images as imageResult[]).filter(
+        (x) =>
+          get_url_extension(x.url) === "jpg" ||
+          get_url_extension(x.url) === "jpeg"
+      );
+
+      console.log(filtered);
+
+      if (filtered.length > 0) {
+        await replyTweetWithImg(
+          client2,
+          filtered.slice(0, 4) as imageResult[],
+          summary.slice(0, 200) as string,
+          tweet.data.id,
+          `\nSource: ${fullUrl}`
+        );
+      } else {
+        // Reply to tweet
+        await replyTweet(
+          client2,
+          summary.slice(0, 200) as string,
+          tweet.data.id,
+          `\nSource: ${fullUrl}`
+        );
+      }
     }
   });
 };
 
-const replyTweet = async (client: TwitterApi, text: string, id: string) => {
-  await client.v1.reply(text, id);
+const replyTweet = async (
+  client: TwitterApi,
+  text: string,
+  id: string,
+  source: string
+) => {
+  await client.v1.reply(text + source, id);
 };
+
+export const replyTweetWithImg = async (
+  client: TwitterApi,
+  urls: imageResult[],
+  text: string,
+  id: string,
+  source: string
+) => {
+  let arry = [];
+  let uploaded_media = [];
+
+  for (let i of urls) {
+    arry.push(getBuffer(i.url));
+  }
+
+  let resolved_buffer = await Promise.all(arry);
+
+  for (let buf of resolved_buffer) {
+    const media = uploaded_media.push(
+      client.v1.uploadMedia(buf, { mimeType: EUploadMimeType.Jpeg })
+    );
+  }
+
+  let resolved_media = await Promise.all(uploaded_media);
+  await client.v2.reply(text + source, id, {
+    media: { media_ids: resolved_media },
+  });
+};
+
+function get_url_extension(url: string) {
+  return url.split(/[#?]/)[0].split(".").pop()!.trim();
+}

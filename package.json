@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@types/twit": "^2.2.30",
+    "axios": "^1.1.3",
     "dotenv": "^16.0.3",
     "i": "^0.3.7",
     "node-summary": "github:TroniPM/node-summary",
