@@ -25,18 +25,25 @@ export const ExecBot = async (client: TwitterApi, client2: TwitterApi) => {
 
   stream.on(ETwitterStreamEvent.Data, async (tweet) => {
     console.log(tweet.data.text);
-    // Ignore RTs or self-sent tweets
-    const isARt =
-      tweet.data.referenced_tweets?.some(
-        (tweet) => tweet.type === "retweeted"
-      ) ?? false;
+    const text = tweet.data.text;
 
-    if (isARt || tweet.data.author_id === bot.data.id) {
-      return;
+    if (!text.toLowerCase().includes("search")) {
+      await replyTweet(client2, "invalid search request", tweet.data.id);
+    } else {
+      const search_phrase = text.match(/search\s+(.*)/i)![1];
+      // Ignore RTs or self-sent tweets
+      const isARt =
+        tweet.data.referenced_tweets?.some(
+          (tweet) => tweet.type === "retweeted"
+        ) ?? false;
+
+      if (isARt || tweet.data.author_id === bot.data.id) {
+        return;
+      }
+
+      // Reply to tweet
+      await replyTweet(client2, "hello friend ", tweet.data.id);
     }
-
-    // Reply to tweet
-    await replyTweet(client2, "hello friend ", tweet.data.id);
   });
 };
 
