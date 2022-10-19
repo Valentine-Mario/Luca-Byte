@@ -1,4 +1,6 @@
 import axios from "axios";
+import Redis from "ioredis";
+const redis = new Redis(process.env.REDIS_URL!);
 
 export const getBuffer = async (image: string): Promise<Buffer> => {
   const response = await axios.get(image, { responseType: "arraybuffer" });
@@ -28,4 +30,24 @@ export const divideEqual = (str: string, num: number): string[] => {
     }
   );
   return creds.res;
+};
+
+export const setItemInRedis = async (
+  key: string,
+  value: string | Buffer,
+  ex: number
+): Promise<void> => {
+  await redis.set(key, value, "EX", ex, (err) => {
+    if (err) console.log("error setting to redis ", err);
+  });
+};
+
+export const getItemInRedis = async (key: string): Promise<string | null> => {
+  let item = await redis.get(key);
+  return item;
+};
+
+export const getBufferInRedis = async (key: string): Promise<Buffer | null> => {
+  const result = await redis.getBuffer(key);
+  return result;
 };

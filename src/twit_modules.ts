@@ -33,7 +33,6 @@ export const ExecBot = async (client: TwitterApi, client2: TwitterApi) => {
   const bot = await client2.readOnly.v2.userByUsername(BOT_NAME);
 
   stream.on(ETwitterStreamEvent.Data, async (tweet) => {
-    console.log(tweet.data.text);
     const text = tweet.data.text;
 
     if (
@@ -42,7 +41,9 @@ export const ExecBot = async (client: TwitterApi, client2: TwitterApi) => {
       // do not reply
     } else {
       const search_match = text.match(/search\s+(.*)/i);
-      console.log(search_match);
+
+      console.log("searching for phrase ", search_match);
+
       if (search_match) {
         let search_phrase = search_match[1];
         const { summary, images, fullUrl } = await getSummary(search_phrase);
@@ -93,24 +94,25 @@ const replyTweetWithImg = async (
   let arry = [];
   let uploaded_media = [];
 
+  //resolve all url to buffer consurently
   for (let i of urls) {
     arry.push(getBuffer(i.url));
   }
-
   let resolved_buffer = await Promise.all(arry);
 
+  //resolve all uploads concurrently
   for (let buf of resolved_buffer) {
     uploaded_media.push(
       client.v1.uploadMedia(buf, { mimeType: EUploadMimeType.Jpeg })
     );
   }
-
   let resolved_media = await Promise.all(uploaded_media);
+
   //limit tweet to 250 charachters
   let all_text = text + source;
   let textLenth = all_text.length / 250;
   let string_partition = divideEqual(all_text, Math.ceil(textLenth));
-   console.log(string_partition);
+   
   if (resolved_media.length > 0) {
     let init_tweet = await client.v2.reply(string_partition[0], id, {
       media: { media_ids: resolved_media },
