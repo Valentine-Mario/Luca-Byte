@@ -40,9 +40,7 @@ export const ExecBot = async (client: TwitterApi, client2: TwitterApi) => {
       // await replyTweet(client2, "invalid search request", tweet.data.id, "");
     } else {
       const search_phrase = text.match(/[search|get]\s+(.*)/i)![1];
-      const { summary, images, fullUrl } = await getSummary(
-        search_phrase
-      );
+      const { summary, images, fullUrl } = await getSummary(search_phrase);
       // Ignore RTs or self-sent tweets
       const isARt =
         tweet.data.referenced_tweets?.some(
@@ -63,7 +61,7 @@ export const ExecBot = async (client: TwitterApi, client2: TwitterApi) => {
         await replyTweetWithImg(
           client2,
           filtered.slice(0, 4),
-          summary.slice(0, 200),
+          summary,
           tweet.data.id,
           `\nSource: ${fullUrl}`
         );
@@ -71,7 +69,7 @@ export const ExecBot = async (client: TwitterApi, client2: TwitterApi) => {
         // Reply to tweet
         await replyTweet(
           client2,
-          summary.slice(0, 200),
+          summary,
           tweet.data.id,
           `\nSource: ${fullUrl}`
         );
@@ -112,7 +110,11 @@ const replyTweetWithImg = async (
   }
 
   let resolved_media = await Promise.all(uploaded_media);
-  await client.v2.reply(text + source, id, {
+  //limit tweet to 200 charachters
+  let subStringLenth=text.length/200
+  let string_partition=divideEqual(`${text}\n\n${source}`, Math.ceil(subStringLenth))
+
+  let init_tweet = await client.v2.reply(text + source, id, {
     media: { media_ids: resolved_media },
   });
 };
@@ -120,3 +122,23 @@ const replyTweetWithImg = async (
 function get_url_extension(url: string) {
   return url.split(/[#?]/)[0].split(".").pop()!.trim();
 }
+
+export const divideEqual = (str: string, num: number) => {
+  const len = str.length / num;
+  const creds = str.split("").reduce(
+    (acc: any, val) => {
+      let { res, currInd } = acc;
+      if (!res[currInd] || res[currInd].length < len) {
+        res[currInd] = (res[currInd] || "") + val;
+      } else {
+        res[++currInd] = val;
+      }
+      return { res, currInd };
+    },
+    {
+      res: [],
+      currInd: 0,
+    }
+  );
+  return creds.res;
+};
