@@ -7,7 +7,6 @@ import { imageResult } from "wikipedia/dist/resultTypes";
 import { getBuffer } from "./lib";
 import { getSummary } from "./wiki_search";
 
-
 const BOT_NAME = "ByteLuca";
 
 export const ExecBot = async (client: TwitterApi, client2: TwitterApi) => {
@@ -38,10 +37,12 @@ export const ExecBot = async (client: TwitterApi, client2: TwitterApi) => {
 
     if (!text.toLowerCase().includes("search")) {
       // do not reply
-     // await replyTweet(client2, "invalid search request", tweet.data.id, "");
+      // await replyTweet(client2, "invalid search request", tweet.data.id, "");
     } else {
-      const search_phrase = text.match(/search\s+(.*)/i)![1];
-      const { summary, images, fullUrl } = await getSummary(search_phrase);
+      const search_phrase = text.match(/[search|get]\s+(.*)/i)![1];
+      const { summary, images, fullUrl } = await getSummary(
+        search_phrase
+      );
       // Ignore RTs or self-sent tweets
       const isARt =
         tweet.data.referenced_tweets?.some(
@@ -88,7 +89,7 @@ const replyTweet = async (
   await client.v1.reply(text + source, id);
 };
 
-export const replyTweetWithImg = async (
+const replyTweetWithImg = async (
   client: TwitterApi,
   urls: imageResult[],
   text: string,

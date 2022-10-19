@@ -2,13 +2,13 @@ import * as dotenv from 'dotenv'
 dotenv.config()
 
 import {TwitConnection} from "./src/twit_connection"
-import {ExecBot, replyTweetWithImg} from "./src/twit_modules"
+import {ExecBot} from "./src/twit_modules"
+import { getSummary } from './src/wiki_search'
 
 const run=async()=>{
   const [client1, client2]=TwitConnection();
 
-  ExecBot(client2, client1);
-  // await getSummary("batman")
+  //ExecBot(client2, client1);
 
 }
 run().then(e=>{
