@@ -37,13 +37,12 @@ export const ExecBot = async (client: TwitterApi, client2: TwitterApi) => {
     const text = tweet.data.text;
 
     if (
-      !text.toLowerCase().includes("search") ||
-      !text.toLowerCase().includes("get")
+      !text.toLowerCase().includes("search")
     ) {
       // do not reply
-      // await replyTweet(client2, "invalid search request", tweet.data.id, "");
     } else {
-      const search_match = text.match(/[search|get]\s+(.*)/i);
+      const search_match = text.match(/search\s+(.*)/i);
+      console.log(search_match);
       if (search_match) {
         let search_phrase = search_match[1];
         const { summary, images, fullUrl } = await getSummary(search_phrase);
@@ -111,7 +110,7 @@ const replyTweetWithImg = async (
   let all_text = text + source;
   let textLenth = all_text.length / 250;
   let string_partition = divideEqual(all_text, Math.ceil(textLenth));
-
+   console.log(string_partition);
   if (resolved_media.length > 0) {
     let init_tweet = await client.v2.reply(string_partition[0], id, {
       media: { media_ids: resolved_media },

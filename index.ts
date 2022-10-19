@@ -3,12 +3,11 @@ dotenv.config()
 
 import {TwitConnection} from "./src/twit_connection"
 import {ExecBot} from "./src/twit_modules"
-import { getSummary } from './src/wiki_search'
 
 const run=async()=>{
   const [client1, client2]=TwitConnection();
 
-  //ExecBot(client2, client1);
+  ExecBot(client2, client1);
   
 }
 run().then(e=>{
