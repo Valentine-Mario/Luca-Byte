@@ -1,6 +1,7 @@
 import {
   ETwitterStreamEvent,
   EUploadMimeType,
+  TweetV1,
   TwitterApi,
 } from "twitter-api-v2";
 import { imageResult } from "wikipedia/dist/resultTypes";
@@ -57,23 +58,13 @@ export const ExecBot = async (client: TwitterApi, client2: TwitterApi) => {
           get_url_extension(x.url) === "jpeg"
       );
 
-      if (filtered.length > 0) {
-        await replyTweetWithImg(
-          client2,
-          filtered.slice(0, 4),
-          summary,
-          tweet.data.id,
-          `\nSource: ${fullUrl}`
-        );
-      } else {
-        // Reply to tweet
-        await replyTweet(
-          client2,
-          summary,
-          tweet.data.id,
-          `\nSource: ${fullUrl}`
-        );
-      }
+      await replyTweetWithImg(
+        client2,
+        filtered.slice(0, 4),
+        summary,
+        tweet.data.id,
+        `\nSource: ${fullUrl}`
+      );
     }
   });
 };
@@ -81,10 +72,10 @@ export const ExecBot = async (client: TwitterApi, client2: TwitterApi) => {
 const replyTweet = async (
   client: TwitterApi,
   text: string,
-  id: string,
-  source: string
-) => {
-  await client.v1.reply(text + source, id);
+  id: string
+): Promise<TweetV1> => {
+  let tweet = await client.v1.reply(text, id);
+  return tweet;
 };
 
 const replyTweetWithImg = async (
@@ -111,19 +102,32 @@ const replyTweetWithImg = async (
 
   let resolved_media = await Promise.all(uploaded_media);
   //limit tweet to 200 charachters
-  let subStringLenth=text.length/200
-  let string_partition=divideEqual(`${text}\n\n${source}`, Math.ceil(subStringLenth))
+  let all_text = text + "\n\n" + source;
+  let subStringLenth = all_text.length / 200;
+  let string_partition = divideEqual(all_text, Math.ceil(subStringLenth));
 
-  let init_tweet = await client.v2.reply(text + source, id, {
-    media: { media_ids: resolved_media },
-  });
+  if (resolved_media.length > 0) {
+    let init_tweet = await client.v2.reply(string_partition[0], id, {
+      media: { media_ids: resolved_media },
+    });
+    string_partition.shift();
+    for (let i of string_partition) {
+      await replyTweet(client, i, init_tweet.data.id);
+    }
+  } else {
+    let init_tweet = await replyTweet(client, string_partition[0], id);
+    string_partition.shift();
+    for (let i of string_partition) {
+      await replyTweet(client, i, init_tweet.id_str);
+    }
+  }
 };
 
 function get_url_extension(url: string) {
   return url.split(/[#?]/)[0].split(".").pop()!.trim();
 }
 
-export const divideEqual = (str: string, num: number) => {
+export const divideEqual = (str: string, num: number): string[] => {
   const len = str.length / num;
   const creds = str.split("").reduce(
     (acc: any, val) => {
