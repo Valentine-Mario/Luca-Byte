@@ -5,7 +5,7 @@ import {
   TwitterApi,
 } from "twitter-api-v2";
 import { imageResult } from "wikipedia/dist/resultTypes";
-import { getBuffer } from "./lib";
+import { getBuffer, get_url_extension, divideEqual } from "./lib";
 import { getSummary } from "./wiki_search";
 
 const BOT_NAME = "ByteLuca";
@@ -36,35 +36,41 @@ export const ExecBot = async (client: TwitterApi, client2: TwitterApi) => {
     console.log(tweet.data.text);
     const text = tweet.data.text;
 
-    if (!text.toLowerCase().includes("search")) {
+    if (
+      !text.toLowerCase().includes("search") ||
+      !text.toLowerCase().includes("get")
+    ) {
       // do not reply
       // await replyTweet(client2, "invalid search request", tweet.data.id, "");
     } else {
-      const search_phrase = text.match(/[search|get]\s+(.*)/i)![1];
-      const { summary, images, fullUrl } = await getSummary(search_phrase);
-      // Ignore RTs or self-sent tweets
-      const isARt =
-        tweet.data.referenced_tweets?.some(
-          (tweet) => tweet.type === "retweeted"
-        ) ?? false;
+      const search_match = text.match(/[search|get]\s+(.*)/i);
+      if (search_match) {
+        let search_phrase = search_match[1];
+        const { summary, images, fullUrl } = await getSummary(search_phrase);
+        // Ignore RTs or self-sent tweets
+        const isARt =
+          tweet.data.referenced_tweets?.some(
+            (tweet) => tweet.type === "retweeted"
+          ) ?? false;
 
-      if (isARt || tweet.data.author_id === bot.data.id) {
-        return;
+        if (isARt || tweet.data.author_id === bot.data.id) {
+          return;
+        }
+
+        const filtered = images.filter(
+          (x) =>
+            get_url_extension(x.url) === "jpg" ||
+            get_url_extension(x.url) === "jpeg"
+        );
+
+        await replyTweetWithImg(
+          client2,
+          filtered.slice(0, 4),
+          summary,
+          tweet.data.id,
+          `\n\nSource: ${fullUrl}`
+        );
       }
-
-      const filtered = images.filter(
-        (x) =>
-          get_url_extension(x.url) === "jpg" ||
-          get_url_extension(x.url) === "jpeg"
-      );
-
-      await replyTweetWithImg(
-        client2,
-        filtered.slice(0, 4),
-        summary,
-        tweet.data.id,
-        `\nSource: ${fullUrl}`
-      );
     }
   });
 };
@@ -101,48 +107,29 @@ const replyTweetWithImg = async (
   }
 
   let resolved_media = await Promise.all(uploaded_media);
-  //limit tweet to 200 charachters
-  let all_text = text + "\n\n" + source;
-  let subStringLenth = all_text.length / 200;
-  let string_partition = divideEqual(all_text, Math.ceil(subStringLenth));
+  //limit tweet to 250 charachters
+  let all_text = text + source;
+  let textLenth = all_text.length / 250;
+  let string_partition = divideEqual(all_text, Math.ceil(textLenth));
 
   if (resolved_media.length > 0) {
     let init_tweet = await client.v2.reply(string_partition[0], id, {
       media: { media_ids: resolved_media },
     });
-    string_partition.shift();
-    for (let i of string_partition) {
-      await replyTweet(client, i, init_tweet.data.id);
-    }
+    makeThread(string_partition, client, init_tweet.data.id);
   } else {
     let init_tweet = await replyTweet(client, string_partition[0], id);
-    string_partition.shift();
-    for (let i of string_partition) {
-      await replyTweet(client, i, init_tweet.id_str);
-    }
+    makeThread(string_partition, client, init_tweet.id_str);
   }
 };
 
-function get_url_extension(url: string) {
-  return url.split(/[#?]/)[0].split(".").pop()!.trim();
-}
-
-export const divideEqual = (str: string, num: number): string[] => {
-  const len = str.length / num;
-  const creds = str.split("").reduce(
-    (acc: any, val) => {
-      let { res, currInd } = acc;
-      if (!res[currInd] || res[currInd].length < len) {
-        res[currInd] = (res[currInd] || "") + val;
-      } else {
-        res[++currInd] = val;
-      }
-      return { res, currInd };
-    },
-    {
-      res: [],
-      currInd: 0,
-    }
-  );
-  return creds.res;
+const makeThread = async (
+  string_partition: string[],
+  client: TwitterApi,
+  id: string
+) => {
+  string_partition.shift();
+  for (let i of string_partition) {
+    await replyTweet(client, i, id);
+  }
 };
