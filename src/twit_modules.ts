@@ -35,7 +35,7 @@ export const ExecBot = async (client: TwitterApi, client2: TwitterApi) => {
   const bot = await client2.readOnly.v2.userByUsername(BOT_NAME);
 
   stream.on(ETwitterStreamEvent.Data, async (tweet) => {
-    const text = tweet.data.text;
+    const text = tweet.data.text.trim();
 
     if (!text.toLowerCase().includes("search")) {
       // do not reply
@@ -43,7 +43,7 @@ export const ExecBot = async (client: TwitterApi, client2: TwitterApi) => {
       const search_match = text.match(/search\s+(.*)/i);
 
       if (search_match) {
-        console.log("searching for phrase ", search_match[1]);
+        console.log("searching for phrase", search_match[1]);
 
         let search_phrase = search_match[1];
         const { summary, images, fullUrl, inCache } = await getSummary(
@@ -65,7 +65,7 @@ export const ExecBot = async (client: TwitterApi, client2: TwitterApi) => {
             images as string[],
             summary,
             tweet.data.id,
-            `\n\nSource: ${fullUrl}`
+            `\nSource: ${fullUrl}`
           );
         } else {
           let img = images as imageResult[];
@@ -81,7 +81,7 @@ export const ExecBot = async (client: TwitterApi, client2: TwitterApi) => {
             filtered.slice(0, 4),
             summary,
             tweet.data.id,
-            `\n\nSource: ${fullUrl}`
+            `\nSource: ${fullUrl}`
           );
         }
       }
@@ -105,19 +105,23 @@ const replyCachedTweet = async (
   id: string,
   source: string
 ) => {
-  //limit tweet to 250 charachters
-  let all_text = text + source;
-  let textLenth = all_text.length / 250;
-  let string_partition = divideEqual(all_text, Math.ceil(textLenth));
+  //limit tweet to 200 charachters
+  let all_text = text.replace(/\r?\n|\r/g, " ") ;
+  let string_partition= all_text.match(/.{1,200}\s/g)
+  if((string_partition![string_partition!.length-1]+source).length<200){
+    string_partition![string_partition!.length-1]=`${string_partition![string_partition!.length-1]}${source}`
+  }else{
+    string_partition![string_partition!.length]=`${source}`
+  }
 
   if (images.length > 0) {
-    let init_tweet = await client.v2.reply(string_partition[0], id, {
+    let init_tweet = await client.v2.reply(string_partition![0], id, {
       media: { media_ids: images },
     });
-    makeThread(string_partition, client, init_tweet.data.id);
+    makeThread(string_partition as string[], client, init_tweet.data.id);
   } else {
-    let init_tweet = await replyTweet(client, string_partition[0], id);
-    makeThread(string_partition, client, init_tweet.id_str);
+    let init_tweet = await replyTweet(client, string_partition![0], id);
+    makeThread(string_partition as string[], client, init_tweet.id_str);
   }
 };
 
@@ -138,18 +142,28 @@ const replyTweetWithImg = async (
   }
   let resolved_buffer = await Promise.all(arry);
 
+  
   //resolve all uploads concurrently
   for (let buf of resolved_buffer) {
-    uploaded_media.push(
-      client.v1.uploadMedia(buf, { mimeType: EUploadMimeType.Jpeg })
-    );
+    //file shoul not be more thna 5242880 bytes
+    if(buf.byteLength<5242880){
+      uploaded_media.push(
+        client.v1.uploadMedia(buf, { mimeType: EUploadMimeType.Jpeg })
+      );
+  
+    }
   }
   let resolved_media = await Promise.all(uploaded_media);
 
-  //limit tweet to 250 charachters
-  let all_text = text + source;
-  let textLenth = all_text.length / 250;
-  let string_partition = divideEqual(all_text, Math.ceil(textLenth));
+  //limit tweet to 200 charachters
+  let all_text = text.replace(/\r?\n|\r/g, " ") ;
+  let string_partition= all_text.match(/.{1,200}\s/g)
+  if((string_partition![string_partition!.length-1]+source).length<200){
+    string_partition![string_partition!.length-1]=`${string_partition![string_partition!.length-1]}${source}`
+  }else{
+    string_partition![string_partition!.length]=`${source}`
+  }
+
 
   if (resolved_media.length > 0) {
     //save media id to cache
@@ -159,13 +173,13 @@ const replyTweetWithImg = async (
       60 * 60 * 24 * 7
     );
 
-    let init_tweet = await client.v2.reply(string_partition[0], id, {
+    let init_tweet = await client.v2.reply(string_partition![0], id, {
       media: { media_ids: resolved_media },
     });
-    makeThread(string_partition, client, init_tweet.data.id);
+    makeThread(string_partition as string[], client, init_tweet.data.id);
   } else {
-    let init_tweet = await replyTweet(client, string_partition[0], id);
-    makeThread(string_partition, client, init_tweet.id_str);
+    let init_tweet = await replyTweet(client, string_partition![0], id);
+    makeThread(string_partition as string[], client, init_tweet.id_str);
   }
 };
 
