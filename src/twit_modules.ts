@@ -7,6 +7,8 @@ import {
 import { imageResult } from "wikipedia/dist/resultTypes";
 import { getBuffer, get_url_extension, divideEqual } from "./lib";
 import { getSummary } from "./wiki_search";
+import { setItemInRedis } from "./lib";
+import { images } from "wikipedia/dist";
 
 const BOT_NAME = "ByteLuca";
 
@@ -35,18 +37,18 @@ export const ExecBot = async (client: TwitterApi, client2: TwitterApi) => {
   stream.on(ETwitterStreamEvent.Data, async (tweet) => {
     const text = tweet.data.text;
 
-    if (
-      !text.toLowerCase().includes("search")
-    ) {
+    if (!text.toLowerCase().includes("search")) {
       // do not reply
     } else {
       const search_match = text.match(/search\s+(.*)/i);
 
-      console.log("searching for phrase ", search_match);
-
       if (search_match) {
+        console.log("searching for phrase ", search_match[1]);
+
         let search_phrase = search_match[1];
-        const { summary, images, fullUrl } = await getSummary(search_phrase);
+        const { summary, images, fullUrl, inCache } = await getSummary(
+          search_phrase
+        );
         // Ignore RTs or self-sent tweets
         const isARt =
           tweet.data.referenced_tweets?.some(
@@ -57,19 +59,31 @@ export const ExecBot = async (client: TwitterApi, client2: TwitterApi) => {
           return;
         }
 
-        const filtered = images.filter(
-          (x) =>
-            get_url_extension(x.url) === "jpg" ||
-            get_url_extension(x.url) === "jpeg"
-        );
+        if (inCache) {
+          await replyCachedTweet(
+            client2,
+            images as string[],
+            summary,
+            tweet.data.id,
+            `\n\nSource: ${fullUrl}`
+          );
+        } else {
+          let img = images as imageResult[];
+          const filtered = img.filter(
+            (x) =>
+              get_url_extension(x.url) === "jpg" ||
+              get_url_extension(x.url) === "jpeg"
+          );
 
-        await replyTweetWithImg(
-          client2,
-          filtered.slice(0, 4),
-          summary,
-          tweet.data.id,
-          `\n\nSource: ${fullUrl}`
-        );
+          await replyTweetWithImg(
+            search_phrase,
+            client2,
+            filtered.slice(0, 4),
+            summary,
+            tweet.data.id,
+            `\n\nSource: ${fullUrl}`
+          );
+        }
       }
     }
   });
@@ -84,7 +98,31 @@ const replyTweet = async (
   return tweet;
 };
 
+const replyCachedTweet = async (
+  client: TwitterApi,
+  images: string[],
+  text: string,
+  id: string,
+  source: string
+) => {
+  //limit tweet to 250 charachters
+  let all_text = text + source;
+  let textLenth = all_text.length / 250;
+  let string_partition = divideEqual(all_text, Math.ceil(textLenth));
+
+  if (images.length > 0) {
+    let init_tweet = await client.v2.reply(string_partition[0], id, {
+      media: { media_ids: images },
+    });
+    makeThread(string_partition, client, init_tweet.data.id);
+  } else {
+    let init_tweet = await replyTweet(client, string_partition[0], id);
+    makeThread(string_partition, client, init_tweet.id_str);
+  }
+};
+
 const replyTweetWithImg = async (
+  search_phrase: string,
   client: TwitterApi,
   urls: imageResult[],
   text: string,
@@ -112,8 +150,15 @@ const replyTweetWithImg = async (
   let all_text = text + source;
   let textLenth = all_text.length / 250;
   let string_partition = divideEqual(all_text, Math.ceil(textLenth));
-   
+
   if (resolved_media.length > 0) {
+    //save media id to cache
+    await setItemInRedis(
+      `${search_phrase}-img`,
+      JSON.stringify(resolved_media),
+      60 * 60 * 24 * 7
+    );
+
     let init_tweet = await client.v2.reply(string_partition[0], id, {
       media: { media_ids: resolved_media },
     });

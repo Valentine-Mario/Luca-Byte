@@ -34,7 +34,7 @@ export const divideEqual = (str: string, num: number): string[] => {
 
 export const setItemInRedis = async (
   key: string,
-  value: string | Buffer,
+  value: string,
   ex: number
 ): Promise<void> => {
   await redis.set(key, value, "EX", ex, (err) => {
@@ -45,9 +45,4 @@ export const setItemInRedis = async (
 export const getItemInRedis = async (key: string): Promise<string | null> => {
   let item = await redis.get(key);
   return item;
-};
-
-export const getBufferInRedis = async (key: string): Promise<Buffer | null> => {
-  const result = await redis.getBuffer(key);
-  return result;
 };
