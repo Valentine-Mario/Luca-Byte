@@ -12,26 +12,6 @@ export const get_url_extension = (url: string) => {
   return url.split(/[#?]/)[0].split(".").pop()!.trim();
 };
 
-export const divideEqual = (str: string, num: number): string[] => {
-  const len = str.length / num;
-  const creds = str.split("").reduce(
-    (acc: any, val) => {
-      let { res, currInd } = acc;
-      if (!res[currInd] || res[currInd].length < len) {
-        res[currInd] = (res[currInd] || "") + val;
-      } else {
-        res[++currInd] = val;
-      }
-      return { res, currInd };
-    },
-    {
-      res: [],
-      currInd: 0,
-    }
-  );
-  return creds.res;
-};
-
 export const setItemInRedis = async (
   key: string,
   value: string,
@@ -45,4 +25,25 @@ export const setItemInRedis = async (
 export const getItemInRedis = async (key: string): Promise<string | null> => {
   let item = await redis.get(key);
   return item;
+};
+
+export const removeItemInRedis = async (key: string) => {
+  await redis.del(key);
+};
+
+export const resolveStringPartition = (
+  text: string,
+  source: string
+): RegExpMatchArray | null => {
+  //limit tweet to 200 charachters
+  let all_text = text.replace(/\r?\n|\r/g, " ");
+  let string_partition = all_text.match(/.{1,200}\s/g);
+  if ((string_partition![string_partition!.length - 1] + source).length < 200) {
+    string_partition![string_partition!.length - 1] = `${
+      string_partition![string_partition!.length - 1]
+    }${source}`;
+  } else {
+    string_partition![string_partition!.length] = `${source}`;
+  }
+  return string_partition;
 };
